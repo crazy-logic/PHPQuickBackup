@@ -1,0 +1,76 @@
+<?php
+
+//This is basically code from two locations i found glued togather to be usefull. 
+//code found on https://stackoverflow.com/questions/12301358/send-attachments-with-php-mail 
+//code found on https://www.virendrachandak.com/techtalk/how-to-create-a-zip-file-using-php/#dir 
+//Matt - May 2018
+
+echo "Welcome to PHPQuickBackup";
+
+$location = '../PHPQuickBackup/backup.zip'; //location of ZIP - in same DIR as this file.
+$tobackup = 'demo_folder'; // folder to zip and send.
+$to = "someone@domain.com"; //address to send it to
+$from = "somebodyelse@domain.com"; //from address - may need to be a real address existing on your server/infrastructure. 
+
+function PHPMailAttach($to, $subject, $message, $file, $from)
+{
+    //$file = $path.$filename;
+    $content = file_get_contents( $file);
+    $content = chunk_split(base64_encode($content));
+    $uid = md5(uniqid(time()));
+    $name = basename($file);
+    
+    // header
+    $header = "From: ".$from." <".$from.">\r\n";
+    $header .= "Reply-To: ".$from."\r\n";
+    $header .= "MIME-Version: 1.0\r\n";
+    $header .= "Content-Type: multipart/mixed; boundary=\"".$uid."\"\r\n\r\n";
+    
+    // message & attachment
+    $nmessage = "--".$uid."\r\n";
+    $nmessage .= "Content-type:text/plain; charset=iso-8859-1\r\n";
+    $nmessage .= "Content-Transfer-Encoding: 7bit\r\n\r\n";
+    $nmessage .= $message."\r\n\r\n";
+    $nmessage .= "--".$uid."\r\n";
+    $nmessage .= "Content-Type: application/octet-stream; name=\"".$file."\"\r\n";
+    $nmessage .= "Content-Transfer-Encoding: base64\r\n";
+    $nmessage .= "Content-Disposition: attachment; filename=\"".$file."\"\r\n\r\n";
+    $nmessage .= $content."\r\n\r\n";
+    $nmessage .= "--".$uid."--";
+    
+    if (mail($to, $subject, $nmessage, $header)) {
+        return true; // Or do something here
+    } else {
+        return false;
+    }
+}
+
+
+$zip = new ZipArchive;
+if ($zip->open($location, ZipArchive::CREATE) === TRUE)
+{
+    if ($handle = opendir($tobackup))
+    {
+        // Add all files inside the directory
+        while (false !== ($entry = readdir($handle)))
+        {
+            if ($entry != "." && $entry != ".." && !is_dir($tobackup.'/' . $entry))
+            {
+                $zip->addFile($tobackup.'/' . $entry);
+            }
+        }
+        closedir($handle);
+    }
+    $zip->close();
+    //now we email the file 
+    PHPMailAttach($to, "PHPQuickBackup has generated a file..", "PHPQuickBackup has generated a file and attached it to the message", $location, $from);
+    
+    //and now delete the backup?!
+    unlink('backup.zip');
+}
+else 
+{
+    echo "</br>Cannot Create backup.zip file!!!</br>";
+}
+
+?>
